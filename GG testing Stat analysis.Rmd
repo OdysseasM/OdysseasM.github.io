@@ -1,0 +1,657 @@
+---
+title: "GG testing stats"
+author: "Odysseas Morgan"
+date: "4/14/2022"
+output: pdf_document
+---
+**GG test processing Script**
+(c) Odysseas Morgan 2022
+
+To run this Script, run each block in sequence using Rstudio. Don't actually knit it into a pdf. 
+Each block performs a particular step in the analysis of the data, and is labled accordingly. There is some residual terminal outputs from unit testing. This can largely be ignored.
+
+Initialization
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+Read in Dataset
+```{r}
+############# Select Dataset  ##############
+
+csv <- read.csv(file.choose()) #open txt format
+GGdataOG = data.frame(csv)
+GGdata = GGdataOG
+```
+
+Create a Dataframe of Unique Assemblies
+```{r}
+# generate DF of unique assemblies
+Sabotaged = c(0)
+JunctType = c(0)
+part1 = c(0)
+part2 = c(0)
+part3 = c(0)
+part4 = c(0)
+part5 = c(0)
+part6 = c(0)
+part7 = c(0)
+part8 = c(0)
+Sucesses = c(0)
+Fails = c(0)
+GGdataUni = data.frame(gID, JunctType, part1, part2, part3, part4, part5, part6, part7, part8, Sucesses, Fails)
+
+noEntries = TRUE
+for(rI in 1:nrow(GGdata)){
+  row = GGdata[rI,]
+  #print(all(row[1,4:11] == row[1,4:11]))
+  addRow = TRUE
+  matchI = 0
+  addSuc = FALSE
+  for(urI in 1:nrow(GGdataUni)){
+    uRow = GGdataUni[urI,]
+    #print(row[4:11])
+    #print(uRow[3:10])
+    #print(all(row[4:11] == uRow[3:10]))
+    
+    if(all(row[4:11] == uRow[3:10])){
+      if(row[1,2] == "Yes"){
+        addSuc = TRUE
+      }
+        
+      addRow = FALSE
+      matchI = urI
+    }
+    
+  }
+  if(addRow){
+    uSuc = 0
+    uFail = 1
+      if(row[1,2] == "Yes"){
+        uSuc = 1
+        uFail = 0
+      }
+        newURow =   c("placeholder",as.character(row[1,3:11]), uSuc, uFail)
+        #print(newURow)
+        if(noEntries){
+          GGdataUni[nrow(GGdataUni),] = newURow
+          noEntries = FALSE
+        } else {
+          GGdataUni[nrow(GGdataUni) + 1,] = newURow
+        }
+  } else {
+  
+    if(addSuc){
+      GGdataUni[matchI,11] = as.integer(GGdataUni[matchI,11]) + 1
+    } else {
+      GGdataUni[matchI,12] = as.integer(GGdataUni[matchI,12]) + 1
+    }
+  }
+}
+#creates copy dataframe
+GGdataUniCopy = GGdataUni
+
+```
+
+
+Create part list (non-unique)
+```{r}
+#initial part list (old)
+
+partLs = c()
+partSuc = c()
+partFail = c()
+partFAs = c()
+fails = 0
+
+for(rI in 1:nrow(GGdata)){
+  #for every assembly
+  #print(rI)
+  row = GGdata[rI,]
+  if(row[,2] != "Yes"){
+    fails = fails + 1
+  }
+  for(partI in 4:11){
+    #for every possible part in the assembly
+    part = row[,partI]
+    #print("part")
+    #print(part)
+    #print(partI)
+    if(!(part %in% partLs) && part != ""){
+      # if part hasnt been seen before
+      if(row[,2] == "Yes"){
+        #if assembly is sucessful
+        set = c(row[,partI], 1, 0)
+        partFAs = append(partFAs, c())
+      } else {
+        #if assembly was a fail
+        set = c(row[,partI], 0, 1)
+        partFAs = append(partFAs, c(row[,1], 0))
+        
+      }
+      #creates new entry for new part
+      partLs = append(partLs, set[1])
+      partSuc = append(partSuc, strtoi(set[2]))
+      partFail = append(partFail, strtoi(set[3]))
+      
+    } else if(part != ""){
+      #if part has been seen before
+      ind = match(part, partLs)
+      if(row[,2] == "Yes"){
+        #if assembly is sucessful
+        partSuc[ind] = strtoi(partSuc[ind]) + 1
+      } else {
+        #if assembly was a fail
+        partFail[ind] = strtoi(partFail[ind]) + 1
+        #partFAs[ind] = append(partFAs[ind], row[1])
+      }
+    }
+  }
+    
+}
+# partLs
+# partFail
+# partFAs
+```
+
+Create Part list (Unique)
+```{r}
+#initial part list (new)
+
+partLs = c()
+partUSuc = c()
+partSuc = c()
+partFail = c()
+partUFail = c()
+partFAs = c()
+fails = 0
+sucs = 0
+
+
+for(rI in 1:nrow(GGdataUni)){
+  #for every assembly
+  #print(rI)
+  row = GGdataUni[rI,]
+  fails = fails + strtoi(row[1,12])
+  sucs = sucs + strtoi(row[1,11])
+
+  for(partI in 3:10){
+    #for every possible part in the assembly
+    part = row[,partI]
+    #print("part")
+    #print(part)
+    #print(partI)
+    if(!(part %in% partLs) && part != ""){
+      # if part hasnt been seen before
+      set = c(row[1,partI], row[1,11], row[1,12])
+        
+        #partFAs = append(partFAs, c(row[,1], 0))
+      #creates new entry for new part
+      partLs = append(partLs, set[1])
+      partSuc = append(partSuc, strtoi(set[2]))
+      partFail = append(partFail, strtoi(set[3]))
+      if(strtoi(set[2]) >= strtoi(set[3])){
+        partUSuc = append(partUSuc, 1)
+        partUFail = append(partUFail, 0)
+      }else {
+        partUSuc = append(partUSuc, 0)
+        partUFail = append(partUFail, 1)
+      }
+      
+    }else if(part != ""){
+      #if part has been seen before
+      ind = match(part, partLs)
+      partSuc[ind] = strtoi(partSuc[ind]) + strtoi(row[1,11])
+      partFail[ind] = strtoi(partFail[ind]) + strtoi(row[1,12])
+      #if suc >= fails, counts as a unique success
+      if(strtoi(row[1,11]) >= strtoi(row[1,12])){
+        partUSuc[ind] = partUSuc[ind] + 1
+      }else{
+        partUFail[ind] = partUFail[ind] + 1
+      }
+      #partFAs[ind] = append(partFAs[ind], row[1])
+    
+    }
+  }
+    
+}
+
+
+
+
+```
+
+
+Detect saboteurs (non-unique)
+```{r}
+#Gen 2 Saboteur finder
+
+#need to reset table to avoid second pass bug
+GGdata = GGdataOG
+
+#absolute saboteurs
+saboteurs = c()
+for(index in 1:length(partSuc)){
+  if(partSuc[index]/(partSuc[index]+partFail[index]) <= 0){
+    saboteurs = append(saboteurs, partLs[index])
+  }
+}
+
+#first round of saboteur accounting
+partFailAC = strtoi(partFail)
+assFailAC = c()
+assFailAC_tollerant = c()
+assFailRaw = c()
+assFailSab = c()
+assSuc = c()
+
+for(rI in 1:nrow(GGdata)){
+  #for every assembly
+  #print(rI)
+  sabAC = FALSE
+  row = GGdata[rI,]
+  if(row[,2] != "Yes"){
+    fails = fails + 1
+    assFailRaw = append(assFailRaw, row[1,1])
+  }
+  for(partI in 4:11){
+    #for every possible part in the assembly
+    part = row[,partI]
+    for(sab in saboteurs){
+      if(part == sab){
+        sabAC = TRUE
+      }
+    }
+  }
+  if(sabAC){
+    GGdata[rI,2] = "Sabotaged"
+    assFailSab = append(assFailSab, row[1,1])
+    for(partI in 4:11){
+      #for every possible part in the assembly
+      part = row[,partI]
+      partInd = match(part, partLs)
+      partFailAC[partInd] = strtoi(partFailAC[partInd]) - 1
+      #print(part)
+    } 
+  }else if(row[,2] != "Yes"){
+    assFailAC = append(assFailAC, row[1,1])
+    if(row[1,2] == "No"){
+      assFailAC_tollerant = append(assFailAC_tollerant, row[1,1])
+    }
+  } else {
+     assSuc = append(assSuc, row[1,1])
+  }
+
+    
+}
+#saboteurs
+#saboteurs = append(saboteurs, "m1469")
+
+
+
+#Threshold saboteurs
+
+#threshold for sucess
+threshold = 0.20
+
+
+
+for(index in 1:length(partSuc)){
+  #print(index)
+  if(partSuc[index]!= 0 && (((partSuc[index]/(partSuc[index] + partFailAC[index])) <= threshold) || (partSuc[index] + partFailAC[index]) == 0)){
+    saboteurs = append(saboteurs, partLs[index])
+  }
+}
+
+saboteurs
+
+#needs to remove threshold sucess saboteur assemblies?
+#assSuc = c()
+
+#needs to remove threshold fail saboteur assemblies
+assFailAC =c()
+
+for(rI in 1:nrow(GGdata)){
+  #for every assembly
+  #print(rI)
+  sabAC = FALSE
+  row = GGdata[rI,]
+  if(row[,2] != "Yes" && row[,2] !="Sabotaged"){
+    #print(row[,1])
+    for(partI in 4:11){
+      #for every possible part in the assembly
+      part = row[,partI]
+      for(sab in saboteurs){
+        if(part == sab){
+          sabAC = TRUE
+        }
+      }
+    }
+    if(sabAC){
+      #print("new Sab")
+      #print(row[,1])
+    }
+  }
+  if(sabAC){
+    GGdata[rI,2] = "Sabotaged"
+    assFailSab = append(assFailSab, row[1,1])
+    for(partI in 4:11){
+      #for every possible part in the assembly
+      part = row[,partI]
+      partInd = match(part, partLs)
+      partFailAC[partInd] = strtoi(partFailAC[partInd]) - 1
+      #print(part)
+    } 
+  }else if(row[,2] != "Yes" && row[,2] != "Sabotaged"){
+    assFailAC = append(assFailAC, row[1,1])
+    if(row[1,2] == "No"){
+      #assFailAC_tollerant = append(assFailAC_tollerant, row[1,1])
+    }
+  } else {
+     assSuc = append(assSuc, row[1,1])
+  }
+}
+saboteurs
+assFailAC
+assSuc
+partFail
+partFailAC
+```
+
+Detect Saboteur (Unique)
+```{r}
+# Saboteur scouring gen 3
+
+#need to reset table to avoid second pass bug
+
+GGdataUni = GGdataUniCopy
+
+#absolute saboteurs
+saboteurs = c()
+for(index in 1:length(partUSuc)){
+  if(partUSuc[index]/(partUSuc[index]+partUFail[index]) <= 0){
+    saboteurs = append(saboteurs, partLs[index])
+  }
+}
+
+saboteurs
+#first round of saboteur accounting
+
+partFailAC = strtoi(partFail)
+partUFailAC = strtoi(partUFail)
+
+
+for(rI in 1:nrow(GGdataUni)){
+  #for every assembly
+  #print(rI)
+  sabAC = FALSE
+  row = GGdataUni[rI,]
+  if(row[11] == 0){
+    assUFailRaw = append(assUFailRaw, row[1,12])
+  }else{
+    #assUSuc = append(assUSuc, row[1,11]) # included later, corner case of threshold saboteurs
+  }
+  for(partI in 3:10){
+    #for every possible part in the assembly
+    part = row[,partI]
+    for(sab in saboteurs){
+      if(part == sab){
+        sabAC = TRUE
+        #print(part)
+      }
+    }
+  }
+  if(sabAC){
+    GGdataUni[rI,1] = TRUE
+    
+    for(partI in 3:10){
+      #for every possible part in the assembly
+      part = row[,partI]
+      partInd = match(part, partLs)
+      #remove failures that should be accounted failures
+      partUFailAC[partInd] = strtoi(partUFailAC[partInd]) - 1
+      partFailAC[partInd] = strtoi(partFailAC[partInd]) - strtoi(row[1,12])
+    } 
+  }
+    
+}
+partUFailAC
+print("pre")
+#saboteurs
+#saboteurs = append(saboteurs, "m1469")
+
+
+
+#Threshold saboteurs
+#cannot use unique assemblies
+
+
+#threshold for sucess
+threshold = 0.20
+
+partSuc
+partFailAC
+
+for(index in 1:length(partSuc)){
+  #print(index)
+  #partUSuc might be wrong
+  if(partSuc[index]!= 0 && (((partSuc[index]/(partSuc[index] + partFailAC[index])) <= threshold) || (partSuc[index] + partFailAC[index]) == 0)){
+    saboteurs = append(saboteurs, partLs[index])
+  }
+}
+
+# saboteurs
+
+#needs to remove threshold success saboteur assemblies?
+#assSuc = c()
+
+####
+
+#needs to remove threshold fail saboteur assemblies
+
+
+# partUFailAC
+
+for(rI in 1:nrow(GGdataUni)){
+  #for every assembly
+  #print(rI)
+  sabAC = FALSE
+  row = GGdataUni[rI,]
+  if(row[1,1] != TRUE){ #kill me i know its ugly
+    #print(row[,1])
+    for(partI in 3:10){
+      #for every possible part in the assembly
+      part = row[1,partI]
+      for(sab in saboteurs){
+        if(part == sab){
+          sabAC = TRUE
+          print("identified Saboteur:")
+          print(part)
+        }
+      }
+    }
+    # if(sabAC){
+    #   #print("new Sab")
+    #   #print(row[,1])
+    # }
+  }
+  #account in part lists
+  if(sabAC){
+    # print("hello")
+    GGdataUni[rI,1] = TRUE
+    for(partI in 3:10){
+      if(row[1,12] != 0){
+        #for every possible part in the assembly
+        part = row[,partI]
+        if(part != ""){
+          partInd = match(part, partLs)
+          #remove accounted for failures
+          partUFailAC[partInd] = strtoi(partUFailAC[partInd]) - 1
+          #print(partUFailAC[partInd])
+          # if(partUFailAC[partInd] < 0){
+          #   print(part)
+          # }
+          #print(part)
+        }
+      }
+    } 
+  }
+}
+#saboteurs
+
+
+###correct block###
+```
+
+
+
+```{r}
+assUFailAC = c()
+assUFailRaw = c()
+assUFailSab = c()
+assUSuc = c()
+assUSucSab = c()
+for(rI in 1:nrow(GGdataUni)){
+  row = GGdataUni[rI,]
+  if(row[1,1] == TRUE){#yes its ugly 
+    if(row[1,12] != 0){
+      assUFailRaw = append(assUFailRaw, row[1,12])
+      assUFailSab = append(assUFailRaw, row[1,12])
+    }else{
+      assUSucSab = append(assUSucSab, row[1,11])
+    }
+  }else{
+    if(row[1,12]!= 0){
+      assUFailRaw = append(assUFailRaw, row[1,12])
+      assUFailAC = append(assUFailAC, row[1,12])
+      #print(row[1,1])
+    }else{
+      assUSuc = append(assUSuc, row[1,11])
+    }
+  }
+}
+
+
+
+```
+
+
+
+
+
+```{r}
+
+partSuc = strtoi(partSuc)
+partFail = strtoi(partFail)
+partFailAC = strtoi(partFailAC)
+partUSuc = strtoi(partUSuc)
+partUFail = strtoi(partUFail)
+partUFailAC = strtoi(partUFailAC)
+
+partSuc
+partUSuc
+partLs
+# pRawRate = strtoi(partSuc) / (strtoi(partFail) + strtoi(partSuc))
+# 
+# pAcRate = strtoi(partSuc) / (strtoi(partFailAC) + strtoi(partSuc))
+# 
+# pAcRate
+# pRawRate
+# 
+# 
+
+
+partDF = data.frame(partLs, partSuc, partFail,partFailAC, partUSuc, partUFail, partUFailAC) # partFailAC, pRawRate, pAcRate)
+partDF
+write.csv(partDF,"/Users/odysseasmorgan/Chemistry/Thesis/Part_Sorting_Code/GG_part_performance.csv", row.names = FALSE)
+
+
+```
+
+
+Assembly Failure by part Breakdown graph
+```{r}
+#only unique assemblies counted
+
+#General colors defined
+
+#CSuc = "#0D37DF" # Intense blue
+CSuc = "#5b45f6ff"
+
+#CSabFail = "#EA4025" #Intense red
+CSabFail ="#f14d3aff"
+#CSabFail = "#fe7369ff"
+
+CAcFail = "#E5BF40"
+
+CSabSuc = "#5ECBA9"
+
+
+#colorSet of display
+colorSetParts = c(CSabFail, CAcFail)
+
+
+ggplot(partDF) + geom_bar(stat = "identity", aes(x = partLs, y = partUFail, fill = 'Sabotaged Failures')) + geom_bar(stat = "identity", aes(x = partLs, y = partUFailAC, fill = 'Unexplained Failures')) + scale_fill_manual(values = colorSetParts) + labs(x = "Part Minipreps", y = "Number of Assembly Failures", fill = "Failure types") + coord_flip() + theme_grey(base_size = 18)
+
+
+```
+Assembly Pie chart
+```{r}
+#color set of graph (in RGB)
+colorSet4 = c(CSabFail,CSuc,CSabSuc,CAcFail)
+
+assOutcomeLab = c("Sucessful Assemblies", "Sabotaged Failures", "Unexplained Failures", "Sucessful Assemblies \nfrom Threshold Saboteurs")
+assOutcomeVal = c(length(assUSuc), length(assUFailSab), length(assUFailAC), length(assUSucSab))
+assDF = data.frame(assOutcomeLab, assOutcomeVal)
+
+write.csv(assDF,"/Users/odysseasmorgan/Chemistry/Thesis/Part_Sorting_Code/Assembly_Performance.csv", row.names = FALSE)
+
+ggplot(assDF, aes(x="", y = assOutcomeVal, fill = assOutcomeLab)) + geom_col() + scale_fill_manual(values = colorSet4) + geom_text(aes(label = assOutcomeVal), position = position_stack(vjust = 0.5)) + labs(x = "",y = "Assemblies", fill = "Assembly Outcomes") + coord_polar(theta = "y") + theme_grey(base_size = 18) 
+
+
+```
+
+
+
+
+
+
+
+```{r}
+
+
+###Unique assembly suc count
+
+sucURateRaw = length(assUSuc)/(length(assUSuc)+length(assFailRaw) + length(assUSucSab))
+
+sucURateAC = (length(assUSuc))/(length(assUSuc)+length(assUFailAC))
+
+###older measures below, counts all replicates
+#raw fail rate
+
+sucRateRaw =  length(assSuc)/(length(assSuc)+length(assFailRaw))
+
+#-2 is to account for successful threshold saboteur m1469
+sucRateAC = (length(assSuc)-2)/(length(assSuc)+length(assFailAC)-2)
+```
+
+Assembly Success rate breakdown
+```{r}
+#only counts unique assemblies
+sucURateLab = c("All Assemblies", "Non-Sabotaged Assemblies")
+sucURateVal = c(sucURateRaw, sucURateAC)
+
+sucRateDF = data.frame(sucURateLab, sucURateVal)
+
+
+ggplot(data=sucRateDF, aes(x = sucURateLab, y = sucURateVal*100, fill = c('r','b'))) + geom_bar(stat = "identity") + labs(x = "", y = "Success Rate %") + ylim(0,100) + theme_grey(base_size = 18)
+
+```
+
+```
+
+
+
+
+
