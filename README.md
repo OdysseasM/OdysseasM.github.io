@@ -1,3 +1,4 @@
-# hello world
+# Hello
 
-Hello. This is my first attempt at using github.
+I am a Chemsitry/Biology Student.
+I sometimes write code for data processing.
